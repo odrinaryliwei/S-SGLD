@@ -22,8 +22,8 @@ YTrain = processMNISTlabels(trainLabelsFile);
 numTrainImages = size(XTrain,4);
 XTest = processMNISTimages(testImagesFile, flattened);
 YTest = processMNISTlabels(testLabelsFile);
-angle = 180;
-XTest = imrotate(XTest,angle,'crop');
+%angle = 180;
+%XTest = imrotate(XTest,angle,'crop');
 %figure
 %imshow(tmp);
 %sigma = 0.7;
@@ -104,8 +104,8 @@ subplot(3,4,11); plot(Res(:,11),'-b');
 subplot(3,4,12); plot(Res(:,12),'-b');
 %%
 if fashion == 1
-    filename = ['MNIST_FASHION_APPROXIMATE_MC','angle=',num2str(angle),'.mat'];
+    filename = ['MNIST_FASHION_APPROXIMATE_MC','.mat'];
 else
-    filename = ['MNIST_APPROXIMATE_MC','angle=',num2str(angle),'.mat'];
+    filename = ['MNIST_APPROXIMATE_MC','.mat'];
 end
 save(filename,'Res','Rsq','YTest','pvar','pmse')
