@@ -8,5 +8,7 @@ Output of our code consists 12 columns. Columns 1-10  are the <a href="https://w
 
 The initial parameters, as specified in the main paper, are stored in `opt`.
 
-We also include parameter ``
+We also include parameter `Sigma` and `angle` to compare results when we add noise or make rotation to testing data.
+
+
 
