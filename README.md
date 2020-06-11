@@ -14,7 +14,7 @@ In file `calls_Lenet5MNIST.m`,
 
 The initial parameters, as specified in the main paper, are stored in `opt`.
 
-Output `Res` consists 12 columns. Columns 1-10  are the <a href="https://www.codecogs.com/eqnedit.php?latex=\mathcal{R}^2" target="_blank"><img src="https://latex.codecogs.com/gif.latex?\mathcal{R}^2" title="\mathcal{R}^2" /></a> with respect to each class of testing data. column 11 is the overall predictive accuracy of testing data, and column 12 is the sparsity of parameters.
+Output `Res` consists 12 columns. Columns 1-10  are the overall <a href="https://www.codecogs.com/eqnedit.php?latex=\mathcal{R}^2" target="_blank"><img src="https://latex.codecogs.com/gif.latex?\mathcal{R}^2" title="\mathcal{R}^2" /></a> with respect to each class of testing data. column 11 is the overall predictive accuracy of testing data, and column 12 is the sparsity of parameters.
 
 Output `Rsq` stores <a href="https://www.codecogs.com/eqnedit.php?latex=\mathcal{R}^2" target="_blank"><img src="https://latex.codecogs.com/gif.latex?\mathcal{R}^2" title="\mathcal{R}^2" /></a> w.r.t. each testing data.
 
