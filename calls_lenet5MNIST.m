@@ -1,7 +1,7 @@
 %%If not already done, load and process MNIST data
 %%use either MNIST or MNIST-FASHION for mnist or mnist-fashion
 clear all
-fashion = 1;
+fashion = 0;
 
 if fashion == 1    
     trainImagesFile = '../datasets/MNIST-FASHION/train-images-idx3-ubyte';
@@ -24,9 +24,7 @@ XTest = processMNISTimages(testImagesFile, flattened);
 YTest = processMNISTlabels(testLabelsFile);
 %angle = 180;
 %XTest = imrotate(XTest,angle,'crop');
-%figure
-%imshow(tmp);
-%sigma = 0.7;
+%sigma = 0;
 %noise = sigma*randn(28,28,1);
 %XTest = XTest + repmat(noise,1,1,1,10000);
 num_class = 10;
@@ -79,7 +77,7 @@ options.rho_1 = 1;
 options.rho_0 = 10;
 options.B = 100;
 options.NS= [5, 20];
-options.gamma = 1e-5;
+options.gamma = 0.5*1e-5;
 options.u = 1;
 options.num_class = num_class;
 
