@@ -17,7 +17,6 @@ function [Res, Rsq, pvar, pmse]  = algo_lenet5MNIST(net, Niter, y, X, y_test, X_
     rho_1_0 = opts.rho_1;
     rho_0_0 = opts.rho_0;
     gamma = opts.gamma;
-    %gamma = 1e-5;
     u = opts.u;
     B = opts.B;
     NS = opts.NS;
@@ -33,7 +32,7 @@ function [Res, Rsq, pvar, pmse]  = algo_lenet5MNIST(net, Niter, y, X, y_test, X_
         Weights(jj) = {dlarray(randn(conv(1),conv(1),conv(2), conv(5)))};
         Bias(jj) = {dlarray(randn(conv(5),1))};
         p = p + conv(1)*conv(1)*conv(2)*conv(5);
-        p = p + conv(5);
+        p = p + conv(5); 
     end
     p_conv = p;
     
@@ -49,7 +48,7 @@ function [Res, Rsq, pvar, pmse]  = algo_lenet5MNIST(net, Niter, y, X, y_test, X_
         dWeights(jj) = {zeros(output, input)};
         dBias(jj) = {zeros(output,1)};
         p = p + output*input;
-        p = p + output;
+        p = p + output; %calculating total number of parameters in Lenet-5
     end
     params.Weights = Weights; params.Bias = Bias;
     params_struct.Weights = dWeights; % whether parameter element (in full layer) is 0 or not
@@ -66,9 +65,9 @@ function [Res, Rsq, pvar, pmse]  = algo_lenet5MNIST(net, Niter, y, X, y_test, X_
     
     %Output
     Res=zeros(1,num_class + 2);
-    Rsq = zeros(400,length(y_test));
-    pvar =zeros(400,length(y_test));
-    pmse = zeros(400,length(y_test));
+    Rsq = zeros(400,length(y_test)); %R^2
+    pvar =zeros(400,length(y_test)); %posterior variance
+    pmse = zeros(400,length(y_test));%posterior mse
     pred_m1 = zeros(num_class, length(y_test)); 
     mse = zeros(1,length(y_test));
     count_est = 1;
@@ -78,7 +77,7 @@ function [Res, Rsq, pvar, pmse]  = algo_lenet5MNIST(net, Niter, y, X, y_test, X_
 
     for kk = 1:Niter
 
-        mini_batch = datasample(1:1:n, B);
+        mini_batch = datasample(1:1:n, B); % select a mini-batch of size B
         mini_dataX = X(:,:,:,mini_batch); 
         mini_dataY = y(mini_batch);
 
@@ -110,7 +109,7 @@ function [Res, Rsq, pvar, pmse]  = algo_lenet5MNIST(net, Niter, y, X, y_test, X_
             W = extractdata(params.Weights{depth_conv + jj});
             grad = scale*GW(coord_set.Weights{jj});
             prob = 1./(1 +exp(const_q +0.5*(rho_1-rho_0)*W(coord_set.Weights{jj}).^2 ...
-                - W(coord_set.Weights{jj}).*grad));
+                - W(coord_set.Weights{jj}).*grad)); % calculate q_j w.r.t. weight parameters
             delta(coord_set.Weights{jj}) = (rand(1,SS)<= prob);
             params_struct.Weights(jj) = {delta};
             
@@ -120,7 +119,7 @@ function [Res, Rsq, pvar, pmse]  = algo_lenet5MNIST(net, Niter, y, X, y_test, X_
             W = extractdata(params.Bias{depth_conv + jj});
             grad = scale*GW(coord_set.Bias{jj});
             prob = 1./(1 +exp(const_q +0.5*(rho_1-rho_0)*W(coord_set.Bias{jj}).^2 ...
-                - W(coord_set.Bias{jj}).*grad));
+                - W(coord_set.Bias{jj}).*grad));  % calculate q_j w.r.t. bias parameters
             delta(coord_set.Bias{jj}) = (rand(SS,1)<= prob);
             params_struct.Bias(jj) = {delta};
             
@@ -131,6 +130,8 @@ function [Res, Rsq, pvar, pmse]  = algo_lenet5MNIST(net, Niter, y, X, y_test, X_
         [fval, gradients] = dlfeval(@model, net, num_class, mini_dataX, mini_dataY, calc_grad, tmp_params);
         
         %Update parameters
+        
+        %SGLD on Convolutional layers
         for jj = 1:depth_conv
             th = extractdata(params.Weights{jj});
             G = extractdata(gradients.Weights{jj});
@@ -145,18 +146,19 @@ function [Res, Rsq, pvar, pmse]  = algo_lenet5MNIST(net, Niter, y, X, y_test, X_
             params.Bias(jj) = {dlarray(th)};
         end
         
+        % update theta in dense layers
         for jj = 1:depth_full
             delta = params_struct.Weights{jj};
             th = extractdata(params.Weights{depth_conv+jj});
             ind = find(delta==0);
             if length(ind) > 0
-                th(ind) = sqrt(1/rho_0)*randn(length(ind),1);
+                th(ind) = sqrt(1/rho_0)*randn(length(ind),1); % sample theta from N(0,1/rho_0) if delta = 0 
             end
             ind = find(delta==1);
             if length(ind) > 0 
                 G = extractdata(gradients.Weights{depth_conv+jj});
                 grad = scale*G(ind) - rho_1*th(ind);
-                th(ind) = th(ind) + 0.5*gamma*grad + sqrt(gamma)*randn(length(ind),1);
+                th(ind) = th(ind) + 0.5*gamma*grad + sqrt(gamma)*randn(length(ind),1);%SGLD update if delta = 1
             end
             params.Weights(depth_conv+jj) = {dlarray(th)};
 
@@ -177,16 +179,16 @@ function [Res, Rsq, pvar, pmse]  = algo_lenet5MNIST(net, Niter, y, X, y_test, X_
         end
 
         % Collecting results
-        if (kk>15000) && (mod(kk,50) == 0)
+        if (kk>15000) && (mod(kk,50) == 0)% 15000 is the burn-in stage, this may vary for different datasets
             tmp_params = Sparsify(params, params_struct ,depth_conv);
             pred = model_prediction(net, X_test,  tmp_params);
-            mse = mse + (1/count_est)*(sum( (pred - y_test_mat).^2 ) - mse);%?
+            mse = mse + (1/count_est)*(sum( (pred - y_test_mat).^2 ) - mse);%taking average of mse among count_est steps
             pred_m1 = pred_m1 + (1/count_est)*(pred - pred_m1);
             count_est = count_est + 1;
             var_m = sum(pred_m1 - pred_m1.^2);
             pmse(count_est,:) = mse; 
             pvar(count_est,:) = var_m;
-            Rsq(count_est,:) = var_m ./ mse; 
+            Rsq(count_est,:) = var_m ./ mse; % R^2 we defined in the main paper
             ind = (mse == 0) & (var_m ==0 );
             Rsq(count_est,ind) = 1;
             for gg =1:num_class
@@ -199,7 +201,7 @@ function [Res, Rsq, pvar, pmse]  = algo_lenet5MNIST(net, Niter, y, X, y_test, X_
             sp = sp + nnz(params_struct.Weights{jj});
             sp = sp + nnz(params_struct.Bias{jj});
         end
-        Res(kk,num_class + 2) = sp/p;
+        Res(kk,num_class + 2) = sp/p; % sp is the sparsity
                 
         if display ~= 0
           [kk*1e-4, Res(kk,:)]
@@ -282,7 +284,7 @@ function pred = model_prediction(net, dataX,  params)
             dlz = dlconv(dlz, th, b, 'DataFormat','SSCB', 'stride', conv(3),'padding',conv(4));
 %             offset = zeros(conv(5),1); scaleFactor = ones(conv(5),1);        
 %             [dlz, mu, sigma] = batchnorm(dlz,offset,scaleFactor,'Dataformat','SSCB');
-            dlz = relu(dlz); %or use relu
+            dlz = relu(dlz); %or use sigmoid
             pooling = net{2*jj,2};
             dlz = maxpool(dlz, pooling(1), 'DataFormat','SSCB', 'stride', pooling(2),'padding',pooling(3));
         end
