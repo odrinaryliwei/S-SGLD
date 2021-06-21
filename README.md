@@ -1,22 +1,18 @@
-# S-SGLD
-the Sparse Stochastic Gradient Langevin Dynamics 
+# SA-SGLD
+the Asynchronous Sparse Stochastic Gradient Langevin Dynamics 
 
-This project is the Sparse stochastic Gradient Langevi Dynamics Algorithm.  
-We apply our method on MNIST(MNIST-FASHION) dataset.
+This project is the Asynchornous Sparse stochastic Gradient Langevi Dynamics Algorithm.
 
-file`algo_Lenet5MNIST.m` realizes Algorithm 2 in the main paper.
+We propose a fast MCMC method to sample from the posterior distribution with a spike and slab prior. We further apply sub-sampling and employ stochastic gradient Langevin dynamics to reduce computational cost, and propose Asynchornous Sparse stochastic Gradient Langevi Dynamics Algorithm (SA-SGLD). We refer readers our paper `xxx` for more detailed background information. 
 
-In file `calls_Lenet5MNIST.m`, 
+We apply our method on logistic regression model. File `live_lr_exact_asyn_sasgld_va.m` compares the relative error and running time of Exact/Asynchorous/SA-SGLD and Variational Approximation algorithm. 
 
-`fashion` determines whether dataset is MNIST or MNIST-FASHION.
+We also apply SA-SGLD algorithm on with a deep neural network (Lenet-5 applied to MNIST-FASHION dataset).
 
-`Sigma` and `angle`(which are commented) are included when we add noise or make rotation to testing data.
 
-The initial parameters, as specified in the main paper, are stored in `opt`.
 
-Output `Res` consists 12 columns. Columns 1-10  are the overall <a href="https://www.codecogs.com/eqnedit.php?latex=\mathcal{R}^2" target="_blank"><img src="https://latex.codecogs.com/gif.latex?\mathcal{R}^2" title="\mathcal{R}^2" /></a> with respect to each class of testing data. column 11 is the overall predictive accuracy of testing data, and column 12 is the sparsity of parameters.
 
-Output `Rsq` stores <a href="https://www.codecogs.com/eqnedit.php?latex=\mathcal{R}^2" target="_blank"><img src="https://latex.codecogs.com/gif.latex?\mathcal{R}^2" title="\mathcal{R}^2" /></a> w.r.t. each testing data.
+
 
 
 
