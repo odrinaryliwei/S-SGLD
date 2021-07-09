@@ -1,4 +1,6 @@
 %%use either MNIST or MNIST-FASHION for mnist or mnist-fashion
+%one could find mnist-fashion dataset from the following link
+%https://github.com/zalandoresearch/fashion-mnist/tree/master/data
 clear all
 trainImagesFile = '../datasets/MNIST-FASHION/train-images-idx3-ubyte';
 trainLabelsFile = '../datasets/MNIST-FASHION/train-labels-idx1-ubyte';
