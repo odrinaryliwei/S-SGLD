@@ -1,7 +1,5 @@
-function [Res, Res_accur, Res_accur_rot, dlnet]  = algo_sasgld(dlnet, Niter, YTrain, XTrain, YTest, XTest, XTest_rot, opts)
+function [Res, Res_accur, dlnet]  = algo_sasgld(dlnet, Niter, YTrain, XTrain, YTest, XTest, opts)
 
-    executionEnvironment = "gpu";
-    
     %data
     classes = unique(YTrain);% categories(YTrain);
     numClasses = numel(classes);
@@ -9,13 +7,11 @@ function [Res, Res_accur, Res_accur_rot, dlnet]  = algo_sasgld(dlnet, Niter, YTr
     
     if opts.im_resize == 1
         XTest = imresize(XTest, [224,224]);
-        XTest_rot = imresize(XTest_rot, [224,224]);
     end
     dlXTest = dlarray(XTest,'SSCB');
-    dlXTest_rot = dlarray(XTest_rot,'SSCB');
-    if (executionEnvironment == "auto" && canUseGPU) || executionEnvironment == "gpu"
+    
+    if opts.gpu == 1
         dlXTest = gpuArray(dlXTest);
-        dlXTest_rot = gpuArray(dlXTest_rot);
     end
 
     %recover inputted parameters
@@ -37,7 +33,11 @@ function [Res, Res_accur, Res_accur_rot, dlnet]  = algo_sasgld(dlnet, Niter, YTr
     param = dlnet.Learnables;
     param_struct = param;
     for ss = 1:LL(1)
-        param_struct.Value{ss} = gpuArray(dlarray(ones(size(param.Value{ss}))));
+        if opts.gpu == 1
+            param_struct.Value{ss} = gpuArray(dlarray(ones(size(param.Value{ss}))));
+        else
+            param_struct.Value{ss} = dlarray(ones(size(param.Value{ss})));
+        end
     end
     %gradients = param;
     
@@ -91,7 +91,7 @@ function [Res, Res_accur, Res_accur_rot, dlnet]  = algo_sasgld(dlnet, Niter, YTr
         dlX = dlarray(single(X),'SSCB');
 
         % If training on a GPU, then convert data to gpuArray.
-        if (executionEnvironment == "auto" && canUseGPU) || executionEnvironment == "gpu"
+        if opts.gpu == 1
             dlX = gpuArray(dlX);
         end
             
@@ -127,7 +127,11 @@ function [Res, Res_accur, Res_accur_rot, dlnet]  = algo_sasgld(dlnet, Niter, YTr
                     if isnan(extractdata(sum(prob)))
                         stop = 1;
                     end
-                    delta(ind_sel) = (rand(1,tbSparse(ss),'double','gpuArray') <= prob);
+                    if opts.gpu == 1
+                        delta(ind_sel) = (rand(1,tbSparse(ss),'double','gpuArray') <= prob);
+                    else
+                        delta(ind_sel) = (rand(1,tbSparse(ss)) <= prob);
+                    end
                     param_struct.Value{ss} = delta;
                     new_par = (param.Value{ss}).*delta;
                     sparse_param.Value{ss} = new_par;
@@ -172,16 +176,11 @@ function [Res, Res_accur, Res_accur_rot, dlnet]  = algo_sasgld(dlnet, Niter, YTr
                 end
 
                 dlYPred = modelPredictions(dlnet, dlXTest, miniBatchSize, numClasses);
-                dlYPred_rot = modelPredictions(dlnet, dlXTest_rot, miniBatchSize, numClasses);
                 [~,idx] = max(extractdata(dlYPred),[],1);
-                [~,idx_rot] = max(extractdata(dlYPred_rot),[],1);
                 YPred = classes(idx);
-                YPred_rot = classes(idx_rot);
-                accuracy = (YPred == YTest);
-                accuracy_rot = (YPred_rot == YTest);                
+                accuracy = (YPred == YTest);               
                 for gg = 1:num_class
                     Res_accur(count_Update,gg) = mean(accuracy(YTest==(gg-1)));
-                    Res_accur_rot(count_Update,gg) = mean(accuracy_rot(YTest==(gg-1)));
                 end
                 Res(count_Update,1) = mean(accuracy);
                 Res(count_Update,2) = double(gather(extractdata(loss)));
