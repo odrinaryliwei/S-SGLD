@@ -7,6 +7,7 @@ trainLabelsFile = '../datasets/MNIST-FASHION/train-labels-idx1-ubyte';
 testImagesFile = '../datasets/MNIST-FASHION/t10k-images-idx3-ubyte';
 testLabelsFile = '../datasets/MNIST-FASHION/t10k-labels-idx1-ubyte';
 
+options.gpu = 1;%set to zero if do not apply gpu
 flattened = 0; %use flattened = 1 for mnist
 XTrain = processMNISTimages(trainImagesFile, flattened);
 YTrain = processMNISTlabels(trainLabelsFile);
@@ -66,7 +67,7 @@ end
 options.model_size = [p, p_0];
 
 tic
-    [Res_lenet, accuracy, accuracy_rotat, dlnet_fitted] = algo_sasgld(dlnet_lenet, Niter, YTrain, XTrain, YTest, XTest, XTest_rotat, options);
+    [Res_lenet, accuracy, dlnet_fitted] = algo_sasgld(dlnet_lenet, Niter, YTrain, XTrain, YTest, XTest, options);
 time = toc;
 
 save('lenet_mnist_fashion.mat');
