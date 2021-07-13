@@ -266,8 +266,8 @@ def updateParam(model, param,param_struct,minibatch_X,minibatch_y):
 
 #main function
 Output = np.zeros(shape=[numIter,2])
-count_out = 0
-for kk in range(1000):
+count = 0
+for kk in range(numIter):
     #Draw a mini batch
     rand_index = np.random.choice(sple_size, minibatch_size)
     minibatch_X, minibatch_y = tf.gather(X_train,rand_index), tf.gather(y_train,rand_index)
@@ -285,15 +285,15 @@ for kk in range(1000):
         model = sparsify(model, param, param_struct)
         y_pred = model(X_test)
         pred = np.argmax(y_pred, axis=-1)
-        Output[count_out,0] = np.sum(pred == y_test) / len(y_test)
+        Output[count,0] = np.sum(pred == y_test) / len(y_test)
         nnz = 0
         for i in range(conv_layer):
             nnz += np.count_nonzero(param_struct[conv_param_name[2*i]]) + np.count_nonzero(param_struct[conv_param_name[2*i+1]]) 
         for i in range(full_layer):
             nnz += np.count_nonzero(param_struct[full_param_name[2*i]]) + np.count_nonzero(param_struct[full_param_name[2*i+1]]) 
-        Output[count_out,1] = nnz/p
-        print([kk, Output[count_out,:]])
-        count_out+=1
+        Output[count,1] = nnz/p
+        print([kk, Output[count,:]])
+        count+=1
 
 #plot results
 line1, = plt.plot(Output[:count,0])
