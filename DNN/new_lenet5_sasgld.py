@@ -1,10 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Sun Jul 11 19:19:19 2021
-
-@author: OrzinaryW
-"""
 import tensorflow as tf
 import scipy as sp
 import numpy as np
@@ -65,65 +58,36 @@ model.add(keras.layers.Dense(num_layers[0],activation = "relu"))
 model.add(keras.layers.Dense(num_layers[1],activation = "relu"))
 model.add(keras.layers.Dense(num_layers[2],activation = 'softmax'))
 
-p = 0
-pre_channel = 1
-for i in range(len(num_channel)):
-    p += pre_channel*kernel_size[i]**2*num_channel[i] + num_channel[i]
-    pre_channel = num_channel[i]
-pre_feature = num_features
-for  i in range(len(num_layers)):
-    p += (pre_feature+1)*num_layers[i]
-    pre_feature = num_layers[i]
-
-const_q = (u_0+1)*np.log(p) + 0.5*np.log(rho_0/rho_1)
-scale = 1.0*sple_size
-#p,const_q,scale
 sparse_size = np.array([10,1,10,1,300,10,200,10,10,0])
 conv_layer_idx = np.array([0,2])
 
+p = 0
+LL = len(model.variables) 
+for i in range(LL):
+    p += np.prod(model.variables[i].shape)
+
+const_q = (u_0+1)*np.log(p) + 0.5*np.log(rho_0/rho_1)
+scale = 1.0*sple_size
+p,const_q,scale
+
 #Initiate param structure
-conv_param_name = ['ConvW1','Convb1','ConvW2','Convb2']
-full_param_name = ['W1','b1','W2','b2','W3','b3']
-
 param,param_struct,param_struct_tmp = {},{},{}
-for i in range(conv_layer):
-    if i == 0:
-        param_struct[conv_param_name[2*i]] = np.ones(shape = (kernel_size[i],kernel_size[i],1,num_channel[i]))
-        param_struct_tmp[conv_param_name[2*i]] = np.ones(shape = (kernel_size[i],kernel_size[i],1,num_channel[i]))
-    else:
-        param_struct[conv_param_name[2*i]] = np.ones(shape = (kernel_size[i],kernel_size[i],num_channel[i-1],num_channel[i]))
-        param_struct_tmp[conv_param_name[2*i]] = np.ones(shape = (kernel_size[i],kernel_size[i],num_channel[i-1],num_channel[i]))
-    param[conv_param_name[2*i]] = model.trainable_variables[2*i].numpy()
-    param[conv_param_name[2*i+1]] = model.trainable_variables[2*i+1].numpy()
-    param_struct[conv_param_name[2*i+1]] = np.ones(shape = num_channel[i])
-    param_struct_tmp[conv_param_name[2*i+1]] = np.ones(shape = num_channel[i])
-
-for i in range(full_layer):
-    if i == 0:
-        param_struct[full_param_name[2*i]] = np.ones(shape = (flatten,num_layers[i]))
-        param_struct_tmp[full_param_name[2*i]] = np.ones(shape = (flatten,num_layers[i]))
-    else:
-        param_struct[full_param_name[2*i]] = np.ones(shape = (num_layers[i-1],num_layers[i]))
-        param_struct_tmp[full_param_name[2*i]] = np.ones(shape = (num_layers[i-1],num_layers[i]))
-    param[full_param_name[2*i]] = model.trainable_variables[2*(conv_layer+i)].numpy() 
-    param[full_param_name[2*i+1]] = model.trainable_variables[2*(conv_layer+i)+1].numpy() 
-    param_struct[full_param_name[2*i+1]] = np.ones(shape = num_layers[i])
-    param_struct_tmp[full_param_name[2*i+1]] = np.ones(shape = num_layers[i])
-        
+for i in range(LL):
+        param[i] = model.variables[i].numpy()
+        param_struct[i] = np.ones(shape = model.variables[i].shape)
+        param_struct_tmp[i] = np.ones(shape = model.variables[i].shape)
 coordset = {}
 
 #sparsify and grad functions
 def sparsify(model, param, param_struct):
     for i in range(conv_layer):
-        weights, biases = param[conv_param_name[2*i]], param[conv_param_name[2*i+1]]
-        weights = weights*param_struct[conv_param_name[2*i]]
-        biases = biases*param_struct[conv_param_name[2*i+1]]
-        model.layers[conv_layer_idx[i]].set_weights([weights, biases])
+        weights = param[2*i]*param_struct[2*i]
+        bias = param[2*i+1]*param_struct[2*i+1]
+        model.layers[conv_layer_idx[i]].set_weights([weights, bias])
     for i in range(full_layer):
-        weights, biases = param[full_param_name[2*i]], param[full_param_name[2*i+1]]
-        weights = weights*param_struct[full_param_name[2*i]]
-        biases = biases*param_struct[full_param_name[2*i+1]]
-        model.layers[i+conv_layer+pool_layer+1].set_weights([weights, biases])#plus 1 is the flatten layer
+        weights = param[2*(conv_layer+i)]*param_struct[2*(conv_layer+i)]
+        bias = param[2*(conv_layer+i)+1]*param_struct[2*(conv_layer+i)+1]
+        model.layers[conv_layer+pool_layer+1+i].set_weights([weights, bias])
     return model
 
 def grad_loss(model, X, y):
@@ -135,33 +99,11 @@ def grad_loss(model, X, y):
 
 #updateSparsityStructure
 def updateSparsityStructure(param_struct, param_struct_tmp, coordset):
-    for i in range(conv_layer):
-        if i == 0:
-            sel_W = np.random.choice(a = kernel_size[i]*kernel_size[i]*num_channel[i],size = sparse_size[2*i],replace = False)
-            sel_b = np.random.choice(a = num_channel[i],size = sparse_size[2*i+1],replace = False)
-        else:
-            sel_W = np.random.choice(a = kernel_size[i]*kernel_size[i]*num_channel[i-1]*num_channel[i],size = sparse_size[2*i],replace = False)
-            sel_b = np.random.choice(a = num_channel[i],size = sparse_size[2*i+1],replace = False)
-        param_struct_tmp[conv_param_name[2*i]][:] = param_struct[conv_param_name[2*i]][:]
-        param_struct_tmp[conv_param_name[2*i+1]][:] = param_struct[conv_param_name[2*i+1]][:]
-        np.reshape(param_struct_tmp[conv_param_name[2*i]],-1)[sel_W] = 0
-        param_struct_tmp[conv_param_name[2*i+1]][sel_b] = 0
-        coordset[conv_param_name[2*i]] = sel_W
-        coordset[conv_param_name[2*i+1]] =sel_b
-        
-    for i in range(full_layer):
-        if i == 0:
-            sel_W = np.random.choice(a=num_features * num_layers[i],size = sparse_size[(conv_layer+i)*2], replace =False)
-            sel_b = np.random.choice(a=num_layers[i],size = sparse_size[(conv_layer+i)*2+1], replace =False)
-        else:
-            sel_W = np.random.choice(a = num_layers[i-1] * num_layers[i],size = sparse_size[(conv_layer+i)*2],replace = False)
-            sel_b = np.random.choice(a = num_layers[i],size = sparse_size[(conv_layer+i)*2+1],replace = False)
-        param_struct_tmp[full_param_name[2*i]][:] = param_struct[full_param_name[2*i]][:]
-        param_struct_tmp[full_param_name[2*i+1]][:] = param_struct[full_param_name[2*i+1]][:]
-        np.reshape(param_struct_tmp[full_param_name[2*i]],-1)[sel_W] = 0
-        param_struct_tmp[full_param_name[2*i+1]][sel_b] = 0
-        coordset[full_param_name[2*i]] = sel_W
-        coordset[full_param_name[2*i+1]] =sel_b 
+    for i in range(LL):
+        sel_W = np.random.choice(a = np.prod(model.variables[i].shape),size = sparse_size[i],replace = False)
+        param_struct_tmp[i][:] = param_struct[i][:]
+        np.reshape(param_struct_tmp[i],-1)[sel_W] = 0
+        coordset[i] = sel_W
     return param_struct_tmp, coordset
 
 #update param Structure
@@ -169,12 +111,10 @@ def updateStructure(model,param,param_struct,param_struct_tmp,coordset,minibatch
     model = sparsify(model, param, param_struct_tmp)
     gradients = grad_loss(model, minibatch_X, minibatch_y)
     #update structure of delta
-    for i in range(conv_layer):
-        weights, biases = param[conv_param_name[2*i]], param[conv_param_name[2*i+1]]
-        weight_index = coordset[conv_param_name[2*i]]
-        bias_index = coordset[conv_param_name[2*i+1]]
+    for i in range(LL):
+        weights, weight_index = param[i],coordset[i]
         #update W
-        grad = gradients[2*i].numpy()
+        grad = gradients[i].numpy()
         grad = np.reshape(grad,-1)[weight_index]
         vec_temp = scale*grad
         weights = np.reshape(weights,-1)[weight_index]
@@ -182,40 +122,7 @@ def updateStructure(model,param,param_struct,param_struct_tmp,coordset,minibatch
         zz2 = 0.5*(rho_1-rho_0)*(weights**2)
         zz = const_q - zz1 + zz2 - 0.5*(zz1**2)
         prob = expit(-zz)
-        np.reshape(param_struct[conv_param_name[2*i]],-1)[weight_index] = np.random.binomial(1,prob)
-        #update b
-        grad = gradients[2*i+1].numpy()
-        biases = biases[bias_index]
-        vec_temp = scale*grad[bias_index]
-        zz1 = -biases* vec_temp
-        zz2 = 0.5*(rho_1-rho_0)*(biases**2)
-        zz = const_q - zz1 + zz2 - 0.5*(zz1**2)
-        prob = expit(-zz)
-        param_struct[conv_param_name[2*i+1]][bias_index] = np.random.binomial(1,prob)
-        
-    for i in range(full_layer):
-        weights, biases = param[full_param_name[2*i]], param[full_param_name[2*i+1]]
-        weight_index = coordset[full_param_name[2*i]]
-        bias_index = coordset[full_param_name[2*i+1]]
-        #update W
-        grad = gradients[2*(conv_layer+i)].numpy()
-        grad = np.reshape(grad,-1)[weight_index]
-        vec_temp = scale*grad
-        weights = np.reshape(weights,-1)[weight_index]
-        zz1 = -weights* vec_temp
-        zz2 = 0.5*(rho_1-rho_0)*(weights**2)
-        zz = const_q - zz1 + zz2 - 0.5*(zz1**2)
-        prob = expit(-zz)
-        np.reshape(param_struct[full_param_name[2*i]],-1)[weight_index] = np.random.binomial(1,prob)
-        #update b
-        grad = gradients[2*(conv_layer+i)+1].numpy()
-        vec_temp = scale*grad[bias_index]
-        biases = biases[bias_index]
-        zz1 = -biases* vec_temp
-        zz2 = 0.5*(rho_1-rho_0)*(biases**2)
-        zz = const_q - zz1 + zz2 - 0.5*(zz1**2)
-        prob = expit(-zz)
-        param_struct[full_param_name[2*i+1]][bias_index] = np.random.binomial(1,prob)
+        np.reshape(param_struct[i],-1)[weight_index] = np.random.binomial(1,prob)
     return param,param_struct,model
 
 #update Parameter
@@ -223,45 +130,16 @@ def updateParam(model, param,param_struct,minibatch_X,minibatch_y):
     model = sparsify(model, param, param_struct)
     gradients = grad_loss(model, minibatch_X, minibatch_y)
     #Updatae conv layer:
-    for i in range(conv_layer):
-        L = np.sum(param_struct[conv_param_name[2*i]]==0)
+    for i in range(LL):
+        L = np.sum(param_struct[i]==0)
         if L > 0:
-            param[conv_param_name[2*i]][param_struct[conv_param_name[2*i]]==0] = np.random.normal(0.0, np.sqrt(1/rho_0), L)
-        L = np.sum(param_struct[conv_param_name[2*i+1]]==0)
+            param[i][param_struct[i]==0] = np.random.normal(0.0, np.sqrt(1/rho_0), L)
+        L = np.sum(param_struct[i]==1)
         if L > 0:
-            param[conv_param_name[2*i+1]][param_struct[conv_param_name[2*i+1]]==0] = np.random.normal(0.0, np.sqrt(1/rho_0), L)    
-        L = np.sum(param_struct[conv_param_name[2*i]]==1)
-        if L > 0:
-            sub_grad = gradients[2*i][param_struct[conv_param_name[2*i]]==1].numpy()
-            sub_grad = -scale*sub_grad - rho_1*param[conv_param_name[2*i]][param_struct[conv_param_name[2*i]]==1]
-            sub_weights = param[conv_param_name[2*i]][param_struct[conv_param_name[2*i]]==1] + 0.5*gamma*sub_grad + np.sqrt(gamma)*np.random.normal(0.0, 1.0,L)
-            param[conv_param_name[2*i]][param_struct[conv_param_name[2*i]]==1] = sub_weights
-        L = np.sum(param_struct[conv_param_name[2*i+1]]==1)
-        if L > 0:
-            sub_grad = gradients[2*i+1][param_struct[conv_param_name[2*i+1]]==1].numpy()
-            sub_grad = -scale*sub_grad - rho_1*param[conv_param_name[2*i+1]][param_struct[conv_param_name[2*i+1]]==1]
-            sub_bias = param[conv_param_name[2*i+1]][param_struct[conv_param_name[2*i+1]]==1] + 0.5*gamma*sub_grad + np.sqrt(gamma)*np.random.normal(0.0, 1.0,L)
-            param[conv_param_name[2*i+1]][param_struct[conv_param_name[2*i+1]]==1] = sub_bias
-            
-    for i in range(full_layer):
-        L = np.sum(param_struct[full_param_name[2*i]]==0)
-        if L > 0:
-            param[full_param_name[2*i]][param_struct[full_param_name[2*i]]==0] = np.random.normal(0.0, np.sqrt(1/rho_0), L)
-        L = np.sum(param_struct[full_param_name[2*i+1]]==0)
-        if L > 0:
-            param[full_param_name[2*i+1]][param_struct[full_param_name[2*i+1]]==0] = np.random.normal(0.0, np.sqrt(1/rho_0), L)    
-        L = np.sum(param_struct[full_param_name[2*i]]==1)
-        if L > 0:
-            sub_grad = gradients[2*(conv_layer+i)][param_struct[full_param_name[2*i]]==1].numpy()
-            sub_grad = -scale*sub_grad - rho_1*param[full_param_name[2*i]][param_struct[full_param_name[2*i]]==1]
-            sub_weights = param[full_param_name[2*i]][param_struct[full_param_name[2*i]]==1] + 0.5*gamma*sub_grad + np.sqrt(gamma)*np.random.normal(0.0, 1.0,L)
-            param[full_param_name[2*i]][param_struct[full_param_name[2*i]]==1] = sub_weights
-        L = np.sum(param_struct[full_param_name[2*i+1]]==1)
-        if L > 0:
-            sub_grad = gradients[2*(conv_layer+i)+1][param_struct[full_param_name[2*i+1]]==1].numpy()
-            sub_grad = -scale*sub_grad - rho_1*param[full_param_name[2*i+1]][param_struct[full_param_name[2*i+1]]==1]
-            sub_bias = param[full_param_name[2*i+1]][param_struct[full_param_name[2*i+1]]==1] + 0.5*gamma*sub_grad + np.sqrt(gamma)*np.random.normal(0.0, 1.0,L)
-            param[full_param_name[2*i+1]][param_struct[full_param_name[2*i+1]]==1] = sub_bias
+            sub_grad = gradients[i][param_struct[i]==1].numpy()
+            sub_grad = -scale*sub_grad - rho_1*param[i][param_struct[i]==1]
+            sub_weights = param[i][param_struct[i]==1] + 0.5*gamma*sub_grad + np.sqrt(gamma)*np.random.normal(0.0, 1.0,L)
+            param[i][param_struct[i]==1] = sub_weights
     return param, model
 
 #main function
@@ -287,13 +165,12 @@ for kk in range(numIter):
         pred = np.argmax(y_pred, axis=-1)
         Output[count,0] = np.sum(pred == y_test) / len(y_test)
         nnz = 0
-        for i in range(conv_layer):
-            nnz += np.count_nonzero(param_struct[conv_param_name[2*i]]) + np.count_nonzero(param_struct[conv_param_name[2*i+1]]) 
-        for i in range(full_layer):
-            nnz += np.count_nonzero(param_struct[full_param_name[2*i]]) + np.count_nonzero(param_struct[full_param_name[2*i+1]]) 
+        for i in range(LL):
+            nnz += np.count_nonzero(param_struct[i])
         Output[count,1] = nnz/p
-        print([kk, Output[count,:]])
+        print(count,Output[count,:])
         count+=1
+    
 
 #plot results
 line1, = plt.plot(Output[:count,0])
